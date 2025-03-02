@@ -1,0 +1,6 @@
+beautifulsoup4==4.10.0
+requests==2.26.0
+Flask==2.0.2
+plotly==5.5.0
+psutil
+pyyaml
