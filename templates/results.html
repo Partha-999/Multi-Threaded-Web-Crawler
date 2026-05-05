@@ -1,292 +1,799 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search Results - Mini Search Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
     <style>
+        :root {
+            --bg: #f5f7fb;
+            --panel: rgba(255, 255, 255, 0.72);
+            --panel-strong: rgba(255, 255, 255, 0.96);
+            --text: #0f172a;
+            --muted: #64748b;
+            --line: rgba(15, 23, 42, 0.09);
+            --accent: #2563eb;
+            --accent-2: #7c3aed;
+            --accent-3: #06b6d4;
+            --success: #16a34a;
+            --shadow: 0 24px 80px rgba(15, 23, 42, 0.13);
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
-            padding: 30px 20px;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 8% 12%, rgba(37, 99, 235, 0.16), transparent 28%),
+                radial-gradient(circle at 92% 8%, rgba(124, 58, 237, 0.16), transparent 20%),
+                radial-gradient(circle at 50% 90%, rgba(6, 182, 212, 0.14), transparent 24%),
+                linear-gradient(135deg, #f8fbff 0%, #edf2ff 42%, #fbfdff 100%);
+            font-family: "Manrope", sans-serif;
+            overflow-x: hidden;
+            padding: 22px;
         }
 
-        .container {
-            max-width: 700px;
-            margin: 0 auto;
-            animation: fadeIn 0.6s ease-in;
+        .noise {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.16;
+            background-image: linear-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent 94%);
         }
 
-        @keyframes fadeIn {
+        .orb {
+            position: fixed;
+            width: 22rem;
+            height: 22rem;
+            border-radius: 50%;
+            filter: blur(26px);
+            opacity: 0.7;
+            pointer-events: none;
+            animation: drift 16s ease-in-out infinite;
+        }
+
+        .orb.one {
+            left: -5rem;
+            top: -6rem;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.4), rgba(37, 99, 235, 0.03) 68%);
+        }
+
+        .orb.two {
+            right: -6rem;
+            top: 7rem;
+            background: radial-gradient(circle, rgba(124, 58, 237, 0.3), rgba(124, 58, 237, 0.03) 68%);
+            animation-delay: -5s;
+        }
+
+        .orb.three {
+            left: 30%;
+            bottom: -9rem;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.28), rgba(6, 182, 212, 0.02) 68%);
+            animation-delay: -8s;
+        }
+
+        @keyframes drift {
+
+            0%,
+            100% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate3d(0, -16px, 0) scale(1.04);
+            }
+        }
+
+        @keyframes enter {
             from {
                 opacity: 0;
-                transform: translateY(-10px);
+                transform: translateY(18px) scale(0.99);
             }
+
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
         }
 
-        .header {
-            margin-bottom: 40px;
+        .page {
+            position: relative;
+            width: min(1180px, 100%);
+            margin: 0 auto;
+            animation: enter 700ms cubic-bezier(.2, .8, .2, 1) both;
         }
 
-        .logo {
-            font-size: 1.5rem;
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 18px 20px;
+            margin-bottom: 18px;
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.62);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
+            display: grid;
+            place-items: center;
+            color: white;
+            font-family: "Space Grotesk", sans-serif;
             font-weight: 700;
-            color: #1f2937;
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 45%, #7c3aed 100%);
+            box-shadow: 0 18px 28px rgba(37, 99, 235, 0.25);
+        }
+
+        .brand-copy strong {
+            display: block;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.08rem;
+            letter-spacing: -0.03em;
+        }
+
+        .brand-copy span {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .pill {
+            padding: 9px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.66);
+            color: #334155;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 18px;
+            align-items: stretch;
             margin-bottom: 20px;
         }
 
-        .search-box {
-            display: flex;
+        .search-stage,
+        .metrics-stage {
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.68));
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(24px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .search-stage::before,
+        .metrics-stage::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), transparent 32%, rgba(124, 58, 237, 0.05));
+            pointer-events: none;
+        }
+
+        .search-stage {
+            padding: 26px;
+        }
+
+        .kicker {
+            display: inline-flex;
+            align-items: center;
             gap: 10px;
-            margin-bottom: 30px;
+            padding: 9px 14px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.08);
+            color: #1d4ed8;
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .kicker::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent-3));
+            box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.12);
+        }
+
+        h1 {
+            margin-top: 18px;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: clamp(2rem, 3.8vw, 3.5rem);
+            line-height: 1.02;
+            letter-spacing: -0.06em;
+            text-wrap: balance;
+        }
+
+        .query-line {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.65;
+        }
+
+        .search-form {
+            margin-top: 22px;
+            display: grid;
+            gap: 12px;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 10px;
+            border-radius: 24px;
+            background: rgba(248, 250, 252, 0.95);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .search-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            color: #1d4ed8;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.12));
+            font-size: 1.1rem;
         }
 
         .search-input {
             flex: 1;
-            padding: 12px 16px;
-            border: 1px solid #e5e7eb;
-            border-radius: 50px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            border: none;
             outline: none;
+            background: transparent;
+            font: inherit;
+            font-size: 1.03rem;
+            color: var(--text);
         }
 
-        .search-input:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.2);
+        .search-input::placeholder {
+            color: #94a3b8;
         }
 
         .search-button {
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white;
+            position: relative;
+            overflow: hidden;
             border: none;
-            border-radius: 50px;
-            font-size: 14px;
-            font-weight: 500;
+            border-radius: 18px;
+            min-width: 138px;
+            height: 54px;
+            padding: 0 22px;
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 48%, #7c3aed 100%);
+            color: #fff;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 0.98rem;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.2);
+            box-shadow: 0 18px 30px rgba(37, 99, 235, 0.22);
+            transition: transform 180ms ease, box-shadow 180ms ease;
         }
 
         .search-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+            transform: translateY(-2px) scale(1.01);
+            box-shadow: 0 22px 36px rgba(37, 99, 235, 0.28);
+        }
+
+        .search-button:active {
+            transform: translateY(0) scale(0.99);
+        }
+
+        .search-button::after {
+            content: "";
+            position: absolute;
+            inset: -50% -60% auto auto;
+            width: 90px;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.18);
+            transform: rotate(28deg);
+            transition: transform 320ms ease;
+        }
+
+        .search-button:hover::after {
+            transform: translateX(-10px) rotate(28deg);
+        }
+
+        .subline {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 0.88rem;
+            padding: 0 2px;
+        }
+
+        .subline strong {
+            color: #0f172a;
+        }
+
+        .metrics-stage {
+            padding: 22px;
+            display: grid;
+            gap: 14px;
+        }
+
+        .metrics-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .metrics-head h2 {
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.2rem;
+            letter-spacing: -0.03em;
+        }
+
+        .live-dot {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(22, 163, 74, 0.09);
+            color: #166534;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .live-dot::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #16a34a;
+            box-shadow: 0 0 0 6px rgba(22, 163, 74, 0.12);
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .metric-card {
+            padding: 18px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid var(--line);
+        }
+
+        .metric-label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+
+        .metric-value {
+            margin-top: 8px;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.04em;
+        }
+
+        .results-shell {
+            margin-top: 18px;
+            padding: 20px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
         }
 
         .results-info {
-            color: #6b7280;
-            font-size: 0.9rem;
-            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 0.92rem;
+            margin-bottom: 18px;
+        }
+
+        .results-info strong {
+            color: #0f172a;
         }
 
         .results-list {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
+            display: grid;
+            gap: 14px;
         }
 
         .result-card {
-            background: white;
-            padding: 24px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: pointer;
-            animation: slideUp 0.5s ease-out forwards;
+            position: relative;
+            display: block;
+            text-decoration: none;
+            color: inherit;
+            padding: 22px 22px 20px;
+            border-radius: 24px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.82));
+            border: 1px solid rgba(15, 23, 42, 0.07);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+            overflow: hidden;
+            animation: rise 600ms cubic-bezier(.2, .8, .2, 1) both;
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+        }
+
+        .result-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.06), transparent 38%, rgba(124, 58, 237, 0.04));
+            opacity: 0;
+            transition: opacity 180ms ease;
+            pointer-events: none;
+        }
+
+        .result-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14);
+            border-color: rgba(37, 99, 235, 0.16);
+        }
+
+        .result-card:hover::before {
+            opacity: 1;
         }
 
         .result-card:nth-child(1) {
-            animation-delay: 0.1s;
+            animation-delay: 60ms;
         }
 
         .result-card:nth-child(2) {
-            animation-delay: 0.2s;
+            animation-delay: 110ms;
         }
 
         .result-card:nth-child(3) {
-            animation-delay: 0.3s;
+            animation-delay: 160ms;
         }
 
         .result-card:nth-child(4) {
-            animation-delay: 0.4s;
+            animation-delay: 210ms;
         }
 
         .result-card:nth-child(5) {
-            animation-delay: 0.5s;
+            animation-delay: 260ms;
         }
 
-        @keyframes slideUp {
+        .result-card:nth-child(6) {
+            animation-delay: 310ms;
+        }
+
+        .result-card:nth-child(7) {
+            animation-delay: 360ms;
+        }
+
+        .result-card:nth-child(8) {
+            animation-delay: 410ms;
+        }
+
+        @keyframes rise {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(18px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
 
-        .result-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
-        }
-
-        .result-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 8px;
-            transition: color 0.3s ease;
-        }
-
-        .result-card:hover .result-title {
-            color: #3b82f6;
-        }
-
-        .result-url {
-            color: #16a34a;
-            font-size: 0.9rem;
-            margin-bottom: 12px;
-            word-break: break-all;
-            transition: color 0.3s ease;
-        }
-
-        .result-card:hover .result-url {
-            color: #15803d;
-        }
-
-        .result-preview {
-            color: #6b7280;
-            font-size: 0.95rem;
-            line-height: 1.6;
-        }
-
-        .no-results {
-            text-align: center;
-            padding: 60px 20px;
-            color: #6b7280;
-        }
-
-        .no-results-icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
-        }
-
-        .no-results h2 {
-            font-size: 1.5rem;
-            color: #1f2937;
+        .result-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
             margin-bottom: 10px;
         }
 
-        .error-message {
-            background: #fee2e2;
-            border: 1px solid #fca5a5;
-            color: #991b1b;
-            padding: 16px;
-            border-radius: 8px;
-            margin-top: 20px;
+        .result-title {
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.18rem;
+            line-height: 1.25;
+            letter-spacing: -0.04em;
+            color: #0f172a;
+        }
+
+        .result-badge {
+            flex: 0 0 auto;
+            padding: 7px 11px;
+            border-radius: 999px;
+            background: rgba(22, 163, 74, 0.09);
+            color: var(--success);
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .result-url {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--success);
+            font-size: 0.88rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            word-break: break-word;
+        }
+
+        .result-url::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: 0.8;
+        }
+
+        .result-preview {
+            color: #475569;
+            font-size: 0.97rem;
+            line-height: 1.72;
+        }
+
+        .empty-state,
+        .error-state {
+            margin-top: 8px;
+            padding: 42px 24px;
+            border-radius: 26px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.72);
+            text-align: center;
+            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+        }
+
+        .empty-mark,
+        .error-mark {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            border-radius: 22px;
+            display: grid;
+            place-items: center;
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.12));
+        }
+
+        .empty-state h2,
+        .error-state h2 {
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.6rem;
+            letter-spacing: -0.04em;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p,
+        .error-state p {
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .footer-note {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 0.86rem;
             text-align: center;
         }
 
         .loading {
-            text-align: center;
-            padding: 40px 20px;
-            color: #6b7280;
+            display: none;
         }
 
-        .spinner {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border: 4px solid #e5e7eb;
-            border-top-color: #3b82f6;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
+        @media (max-width: 980px) {
+            .hero {
+                grid-template-columns: 1fr;
+            }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
+            .metric-grid {
+                grid-template-columns: 1fr 1fr;
             }
         }
 
-        @media (max-width: 600px) {
-            .search-box {
+        @media (max-width: 720px) {
+            body {
+                padding: 14px;
+            }
+
+            .topbar {
                 flex-direction: column;
+                align-items: flex-start;
             }
 
+            .pill-row {
+                justify-content: flex-start;
+            }
+
+            .search-stage,
+            .metrics-stage,
+            .results-shell {
+                border-radius: 24px;
+            }
+
+            .search-stage,
+            .metrics-stage {
+                padding: 18px;
+            }
+
+            .search-row {
+                flex-direction: column;
+                padding: 12px;
+            }
+
+            .search-icon,
             .search-button {
                 width: 100%;
             }
 
-            .result-card {
-                padding: 16px;
+            .metric-grid {
+                grid-template-columns: 1fr;
             }
 
-            .result-title {
-                font-size: 1rem;
+            .result-top {
+                flex-direction: column;
             }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">Mini Search Engine</div>
-            <form class="search-box" method="get" action="/search">
-                <input 
-                    type="text" 
-                    name="q" 
-                    class="search-input" 
-                    placeholder="Search the web..." 
-                    value="{{ query }}"
-                    autofocus
-                >
-                <button type="submit" class="search-button">Search</button>
-            </form>
-        </div>
 
-        {% if query %}
+<body>
+    <div class="noise"></div>
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+    <div class="orb three"></div>
+
+    <main class="page">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark">M</div>
+                <div class="brand-copy">
+                    <strong>Mini Search Engine</strong>
+                    <span>Trusted search over distributed crawled pages</span>
+                </div>
+            </div>
+            <div class="pill-row">
+                <span class="pill">Kafka queued</span>
+                <span class="pill">Elasticsearch ranked</span>
+                <span class="pill">Trusted domains</span>
+            </div>
+        </header>
+
+        <section class="hero">
+            <div class="search-stage">
+                <div class="kicker">Search Results</div>
+                <h1>Results for “{{ query }}”</h1>
+                <p class="query-line">
+                    Clean, ranked links from trusted domains with title-heavy relevance and compact previews.
+                </p>
+
+                <form class="search-form" method="get" action="/search">
+                    <div class="search-row">
+                        <div class="search-icon">⌕</div>
+                        <input type="text" name="q" class="search-input" value="{{ query }}"
+                            placeholder="Refine your search..." autofocus>
+                        <button type="submit" class="search-button">Search</button>
+                    </div>
+                    <div class="subline">
+                        <span>Tip: use specific terms for stronger ranking</span>
+                        <span>Trusted sources only</span>
+                    </div>
+                </form>
+            </div>
+
+            <aside class="metrics-stage">
+                <div class="metrics-head">
+                    <h2>Query Intelligence</h2>
+                    <span class="live-dot">Live</span>
+                </div>
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Rank Bias</div>
+                        <div class="metric-value">Title-first</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Scope</div>
+                        <div class="metric-value">Trusted web</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Snippets</div>
+                        <div class="metric-value">200 chars</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Duplicates</div>
+                        <div class="metric-value">Removed</div>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="results-shell">
+            {% if query %}
             {% if error %}
-                <div class="error-message">
-                    ⚠️ Could not connect to search service. Please try again later.
-                </div>
+            <div class="error-state">
+                <div class="error-mark">!</div>
+                <h2>Search service unavailable</h2>
+                <p>Elasticsearch could not be reached. Please try again once the index service is available.</p>
+            </div>
             {% elif results %}
-                <div class="results-info">
-                    Found {{ results|length }} result{{ 's' if results|length != 1 else '' }} for "<strong>{{ query }}</strong>"
-                </div>
-                <div class="results-list">
-                    {% for result in results %}
-                        <a href="{{ result.url }}" target="_blank" style="text-decoration: none; color: inherit;">
-                            <div class="result-card">
-                                <h3 class="result-title">{{ result.title }}</h3>
-                                <div class="result-url">{{ result.url }}</div>
-                                <p class="result-preview">{{ result.preview }}</p>
-                            </div>
-                        </a>
-                    {% endfor %}
-                </div>
+            <div class="results-info">
+                <span>Found <strong>{{ results|length }}</strong> result{{ 's' if results|length != 1 else '' }}</span>
+                <span>Showing trusted, de-duplicated pages only</span>
+            </div>
+            <div class="results-list">
+                {% for result in results %}
+                <a href="{{ result.url }}" target="_blank" rel="noopener noreferrer" class="result-card">
+                    <div class="result-top">
+                        <h3 class="result-title">{{ result.title }}</h3>
+                        <span class="result-badge">Trusted</span>
+                    </div>
+                    <div class="result-url">{{ result.url }}</div>
+                    <p class="result-preview">{{ result.preview }}</p>
+                </a>
+                {% endfor %}
+            </div>
             {% else %}
-                <div class="no-results">
-                    <div class="no-results-icon">🔍</div>
-                    <h2>No results found</h2>
-                    <p>Try different keywords or search terms</p>
-                </div>
+            <div class="empty-state">
+                <div class="empty-mark">⌕</div>
+                <h2>No results found</h2>
+                <p>Try a more specific query or different keywords. Only relevant trusted pages are shown.</p>
+            </div>
             {% endif %}
-        {% endif %}
-    </div>
+            {% endif %}
+
+            <div class="footer-note">Mini Search Engine • Clean ranking • Trusted web only</div>
+        </section>
+    </main>
 </body>
+
 </html>

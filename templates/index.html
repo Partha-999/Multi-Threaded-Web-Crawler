@@ -5,135 +5,515 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Search Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
     <style>
+        :root {
+            --bg: #f5f7fb;
+            --bg-alt: #edf2ff;
+            --panel: rgba(255, 255, 255, 0.72);
+            --panel-strong: rgba(255, 255, 255, 0.92);
+            --text: #0f172a;
+            --muted: #667085;
+            --line: rgba(15, 23, 42, 0.08);
+            --accent: #2563eb;
+            --accent-2: #7c3aed;
+            --accent-3: #06b6d4;
+            --shadow: 0 24px 80px rgba(15, 23, 42, 0.14);
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
-            display: flex;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.18), transparent 28%),
+                radial-gradient(circle at 90% 10%, rgba(124, 58, 237, 0.18), transparent 22%),
+                radial-gradient(circle at 50% 80%, rgba(6, 182, 212, 0.16), transparent 24%),
+                linear-gradient(135deg, #f8fbff 0%, #eef3ff 40%, #f9fbff 100%);
+            font-family: "Manrope", sans-serif;
+            overflow-x: hidden;
+        }
+
+        .noise {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.18;
+            background-image: linear-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 92%);
+        }
+
+        .orb {
+            position: fixed;
+            width: 28rem;
+            height: 28rem;
+            border-radius: 50%;
+            filter: blur(24px);
+            opacity: 0.7;
+            pointer-events: none;
+            animation: float 14s ease-in-out infinite;
+        }
+
+        .orb.one {
+            top: -9rem;
+            left: -7rem;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.48), rgba(37, 99, 235, 0.02) 68%);
+        }
+
+        .orb.two {
+            right: -9rem;
+            top: 8rem;
+            background: radial-gradient(circle, rgba(124, 58, 237, 0.36), rgba(124, 58, 237, 0.02) 68%);
+            animation-delay: -4s;
+        }
+
+        .orb.three {
+            left: 18%;
+            bottom: -12rem;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.32), rgba(6, 182, 212, 0.02) 68%);
+            animation-delay: -7s;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate3d(0, -18px, 0) scale(1.05);
+            }
+        }
+
+        .shell {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 32px 18px;
+        }
+
+        .hero {
+            width: min(1200px, 100%);
+            display: grid;
+            grid-template-columns: 1.1fr 1.3fr;
+            gap: 24px;
             align-items: center;
-            justify-content: center;
-            padding: 20px;
+            animation: intro 900ms cubic-bezier(.2, .8, .2, 1) both;
         }
 
-        .container {
-            text-align: center;
-            animation: fadeIn 0.8s ease-in;
-        }
-
-        @keyframes fadeIn {
+        @keyframes intro {
             from {
                 opacity: 0;
-                transform: translateY(-20px);
+                transform: translateY(24px) scale(0.985);
             }
 
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
         }
 
-        h1 {
-            font-size: 4rem;
-            color: #1f2937;
-            margin-bottom: 10px;
-            font-weight: 700;
-            letter-spacing: -1px;
-        }
-
-        .subtitle {
-            font-size: 1.1rem;
-            color: #6b7280;
-            margin-bottom: 50px;
-        }
-
-        .search-box {
-            max-width: 600px;
-            margin: 0 auto;
+        .copy {
             position: relative;
+            padding: 30px 8px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            backdrop-filter: blur(14px);
+            box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #14347d;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .badge::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent-3));
+            box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.12);
+        }
+
+        h1 {
+            margin-top: 22px;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: clamp(3.6rem, 7vw, 6.9rem);
+            line-height: 0.95;
+            letter-spacing: -0.07em;
+            max-width: 10ch;
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 42%, #6d28d9 72%, #0ea5e9 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-wrap: balance;
+        }
+
+        .headline-copy {
+            margin-top: 18px;
+            max-width: 56ch;
+            font-size: 1.05rem;
+            line-height: 1.75;
+            color: var(--muted);
+        }
+
+        .meta-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+
+        .meta-chip {
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.64);
+            backdrop-filter: blur(14px);
+            color: #334155;
+            font-weight: 600;
+            font-size: 0.9rem;
+            box-shadow: 0 14px 45px rgba(15, 23, 42, 0.07);
+        }
+
+        .search-panel {
+            position: relative;
+            padding: 28px;
+            border-radius: 32px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.66));
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(24px);
+            overflow: hidden;
+        }
+
+        .search-panel::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), transparent 35%, rgba(124, 58, 237, 0.06));
+            pointer-events: none;
+        }
+
+        .panel-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .panel-title {
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.15rem;
+            letter-spacing: -0.03em;
+        }
+
+        .panel-subtitle {
+            color: var(--muted);
+            font-size: 0.92rem;
+            margin-top: 4px;
         }
 
         .search-form {
+            position: relative;
+            display: grid;
+            gap: 14px;
+        }
+
+        .search-row {
             display: flex;
-            gap: 10px;
+            gap: 12px;
+            padding: 10px;
+            border-radius: 24px;
+            background: rgba(248, 250, 252, 0.95);
+            border: 1px solid rgba(15, 23, 42, 0.07);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+
+        .search-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.12));
+            color: #1d4ed8;
+            font-size: 1.15rem;
+            flex: 0 0 auto;
         }
 
         .search-input {
             flex: 1;
-            padding: 14px 20px;
-            border: 1px solid #e5e7eb;
-            border-radius: 50px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            border: none;
+            background: transparent;
             outline: none;
-        }
-
-        .search-input:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.2);
+            font: inherit;
+            font-size: 1.08rem;
+            color: var(--text);
+            padding: 0 6px;
         }
 
         .search-input::placeholder {
-            color: #9ca3af;
+            color: #94a3b8;
         }
 
         .search-button {
-            padding: 14px 32px;
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white;
+            position: relative;
+            overflow: hidden;
             border: none;
-            border-radius: 50px;
-            font-size: 16px;
-            font-weight: 500;
+            border-radius: 18px;
+            padding: 0 24px;
+            min-width: 146px;
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 45%, #7c3aed 100%);
+            color: white;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.2);
+            box-shadow: 0 18px 30px rgba(37, 99, 235, 0.26);
+            transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+        }
+
+        .search-button::after {
+            content: "";
+            position: absolute;
+            inset: -40% -60% auto auto;
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.22);
+            transform: rotate(25deg);
+            filter: blur(2px);
+            transition: transform 320ms ease;
         }
 
         .search-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+            transform: translateY(-2px) scale(1.01);
+            box-shadow: 0 24px 42px rgba(37, 99, 235, 0.3);
+            filter: saturate(1.05);
+        }
+
+        .search-button:hover::after {
+            transform: translateX(-12px) rotate(25deg);
         }
 
         .search-button:active {
-            transform: translateY(0);
+            transform: translateY(0) scale(0.99);
         }
 
-        @media (max-width: 600px) {
-            h1 {
-                font-size: 2.5rem;
+        .hint-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+            color: #64748b;
+            font-size: 0.9rem;
+            padding: 2px 4px 0;
+        }
+
+        .hint-row strong {
+            color: #0f172a;
+        }
+
+        .card-stack {
+            display: grid;
+            gap: 16px;
+        }
+
+        .insight-card {
+            padding: 16px 18px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid var(--line);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+            backdrop-filter: blur(18px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .insight-card span {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .insight-card strong {
+            display: block;
+            font-family: "Space Grotesk", sans-serif;
+            margin-top: 4px;
+            font-size: 1rem;
+        }
+
+        .micro-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .micro-item {
+            border-radius: 18px;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.66);
+            border: 1px solid var(--line);
+        }
+
+        .micro-item .label {
+            font-size: 0.78rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .micro-item .value {
+            margin-top: 8px;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+
+        @media (max-width: 960px) {
+            .hero {
+                grid-template-columns: 1fr;
             }
 
-            .search-form {
+            h1 {
+                max-width: 12ch;
+            }
+        }
+
+        @media (max-width: 680px) {
+            .shell {
+                padding: 18px 14px 26px;
+            }
+
+            .copy,
+            .search-panel {
+                padding-left: 0;
+                padding-right: 0;
+            }
+
+            .search-panel {
+                padding: 18px;
+                border-radius: 24px;
+            }
+
+            .search-row {
                 flex-direction: column;
+                padding: 12px;
+            }
+
+            .search-icon {
+                width: 100%;
+                height: 52px;
             }
 
             .search-button {
-                width: 100%;
+                min-width: 100%;
+                height: 54px;
+            }
+
+            .micro-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: clamp(3rem, 16vw, 4.4rem);
             }
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <h1>Mini Search Engine</h1>
-        <p class="subtitle">Search across crawled web pages</p>
+    <div class="noise"></div>
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+    <div class="orb three"></div>
 
-        <div class="search-box">
-            <form class="search-form" method="get" action="/search">
-                <input type="text" name="q" class="search-input" placeholder="Search the web..." required autofocus>
-                <button type="submit" class="search-button">Search</button>
-            </form>
-        </div>
-    </div>
+    <main class="shell">
+        <section class="hero">
+            <div class="copy">
+                <div class="badge">Distributed Mini Search Engine</div>
+                <h1>Search with signal, not noise.</h1>
+                <p class="headline-copy">
+                    A premium search interface for your distributed crawler: fast discovery, trusted sources,
+                    and clean results rendered with focus and intent.
+                </p>
+
+                <div class="meta-row">
+                    <div class="meta-chip">Kafka queue</div>
+                    <div class="meta-chip">Elasticsearch index</div>
+                    <div class="meta-chip">Trusted web results</div>
+                </div>
+            </div>
+
+            <div class="search-panel">
+                <div class="panel-top">
+                    <div>
+                        <div class="panel-title">Explore the indexed web</div>
+                        <div class="panel-subtitle">Type any topic, person, paper, or concept</div>
+                    </div>
+                    <div class="badge" style="padding: 8px 12px; font-size: 0.72rem;">Live Search</div>
+                </div>
+
+                <form class="search-form" method="get" action="/search">
+                    <div class="search-row">
+                        <div class="search-icon">⌕</div>
+                        <input type="text" name="q" class="search-input"
+                            placeholder="Search the web, papers, and knowledge..." required autofocus>
+                        <button type="submit" class="search-button">Search</button>
+                    </div>
+                    <div class="hint-row">
+                        <span>Try <strong>machine learning</strong>, <strong>quantum physics</strong>, or
+                            <strong>renewable energy</strong>.</span>
+                        <span>Powered by Kafka + Elasticsearch</span>
+                    </div>
+                </form>
+
+                <div class="micro-grid">
+                    <div class="micro-item">
+                        <div class="label">Crawl</div>
+                        <div class="value">Distributed</div>
+                    </div>
+                    <div class="micro-item">
+                        <div class="label">Index</div>
+                        <div class="value">Trusted only</div>
+                    </div>
+                    <div class="micro-item">
+                        <div class="label">Ranking</div>
+                        <div class="value">Title-boosted</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
 </body>
 
 </html>
