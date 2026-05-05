@@ -105,9 +105,9 @@ A distributed, scalable web crawler and search engine built using Kafka, Elastic
 🔍 Example Queries
 ------------------
 
-   machine learning
-   president of india
-   newton laws
+   machine learning,
+   president of india,
+   newton laws,
    data structures
 
 
