@@ -1,5 +1,22 @@
-start_url: "https://en.wikipedia.org/wiki/Ram_Charan"
-max_pages: 50
-num_threads: 10
-max_depth: 3
-retry_attempts: 3
+crawler:
+  start_urls:
+    - "https://en.wikipedia.org/wiki/Main_Page"
+    - "https://en.wikipedia.org/wiki/Mathematics"
+    - "https://en.wikipedia.org/wiki/Physics"
+    - "https://en.wikipedia.org/wiki/Computer_science"
+    - "https://en.wikipedia.org/wiki/India"
+    - "https://en.wikipedia.org/wiki/Artificial_intelligence"
+    - "https://en.wikipedia.org/wiki/World_War_II"
+  max_pages: 10000
+  num_threads: 20
+  max_depth: 3
+  retry_attempts: 3
+
+kafka:
+  bootstrap_servers: "localhost:9092"
+  topic: "crawl-urls"
+  group_id: "crawler-workers"
+
+elasticsearch:
+  hosts: "http://localhost:9200"
+  index: "web_pages"

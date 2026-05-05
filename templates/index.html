@@ -1,158 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>URL Crawler and System Resource Monitor</title>
-    <script src="https://cdn.jsdelivr.net/npm/socket.io@4.0.1/dist/socket.io.min.js"></script>
+    <title>Mini Search Engine</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
         }
 
-        h1 {
+        .container {
             text-align: center;
+            animation: fadeIn 0.8s ease-in;
         }
 
-        #result {
-            margin-top: 20px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: #f9f9f9;
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
-        .input-group {
-            margin-bottom: 20px;
+        h1 {
+            font-size: 4rem;
+            color: #1f2937;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -1px;
         }
 
-        .input-group input {
-            width: 80%;
-            padding: 8px;
+        .subtitle {
+            font-size: 1.1rem;
+            color: #6b7280;
+            margin-bottom: 50px;
+        }
+
+        .search-box {
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 14px 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 50px;
             font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            outline: none;
         }
 
-        .input-group button {
-            padding: 8px 16px;
+        .search-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.2);
+        }
+
+        .search-input::placeholder {
+            color: #9ca3af;
+        }
+
+        .search-button {
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
             font-size: 16px;
+            font-weight: 500;
             cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.2);
         }
 
-        #cpu, #memory {
-            margin-top: 20px;
-            font-size: 18px;
+        .search-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
         }
 
-        #sublinks {
-            margin-top: 20px;
+        .search-button:active {
+            transform: translateY(0);
         }
 
-        #sublinks ul {
-            list-style-type: none;
-            padding: 0;
-        }
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2.5rem;
+            }
 
-        #sublinks ul li {
-            margin-bottom: 5px;
-        }
+            .search-form {
+                flex-direction: column;
+            }
 
-        #sublinks a {
-            text-decoration: none;
-            color: #0066cc;
-        }
-
-        #sublinks a:hover {
-            text-decoration: underline;
-        }
-
-        #timeTaken {
-            margin-top: 10px;
-            font-weight: bold;
+            .search-button {
+                width: 100%;
+            }
         }
     </style>
 </head>
+
 <body>
+    <div class="container">
+        <h1>Mini Search Engine</h1>
+        <p class="subtitle">Search across crawled web pages</p>
 
-    <h1>URL Crawler and System Resource Monitor</h1>
-
-    <!-- URL input section -->
-    <div class="input-group">
-        <input type="text" id="url" placeholder="Paste a URL here...">
-        <button onclick="getSublinks()">Get Sublinks</button>
+        <div class="search-box">
+            <form class="search-form" method="get" action="/search">
+                <input type="text" name="q" class="search-input" placeholder="Search the web..." required autofocus>
+                <button type="submit" class="search-button">Search</button>
+            </form>
+        </div>
     </div>
-
-    <!-- Section to display sublinks -->
-    <div id="sublinks">
-        <h3>Sublinks:</h3>
-        <ul id="subLinksList"></ul>
-    </div>
-
-    <!-- Section to display CPU and memory usage -->
-    <div id="cpu"></div>
-    <div id="memory"></div>
-
-    <!-- Display the time taken to fetch sublinks -->
-    <div id="timeTaken"></div>
-
-    <script>
-        // Connect to the Socket.IO server
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
-
-        // Listen for the 'system_usage' event and update the page
-        socket.on('system_usage', function(data) {
-            document.getElementById("cpu").innerHTML = "CPU Usage: " + data.cpu + "%";
-            document.getElementById("memory").innerHTML = "Memory Usage: " + data.memory + "%";
-        });
-
-        // Function to fetch sublinks for the provided URL
-        function getSublinks() {
-            var url = document.getElementById("url").value.trim();
-            if (url === "") {
-                alert("Please enter a URL.");
-                return;
-            }
-
-            // Clear previous sublinks and time
-            document.getElementById("subLinksList").innerHTML = "";
-            document.getElementById("timeTaken").innerHTML = "";
-
-            // Start the timer
-            var startTime = Date.now();
-
-            // Send the URL to the server to fetch sublinks
-            fetch(`/get_sublinks?url=${encodeURIComponent(url)}`)
-                .then(response => response.json())
-                .then(data => {
-                    // End the timer
-                    var endTime = Date.now();
-                    var timeTaken = (endTime - startTime) / 1000;  // Time in seconds
-
-                    // Show the time it took to fetch sublinks
-                    document.getElementById("timeTaken").innerHTML = "Time taken: " + timeTaken.toFixed(2) + " seconds";
-
-                    // Display the sublinks
-                    if (data.sublinks && data.sublinks.length > 0) {
-                        var ul = document.getElementById("subLinksList");
-                        data.sublinks.forEach(link => {
-                            var li = document.createElement("li");
-                            var a = document.createElement("a");
-                            a.href = link;
-                            a.target = "_blank";
-                            a.innerText = link;
-                            li.appendChild(a);
-                            ul.appendChild(li);
-                        });
-                    } else {
-                        document.getElementById("subLinksList").innerHTML = "No sublinks found.";
-                    }
-                })
-                .catch(error => {
-                    console.error("Error fetching sublinks:", error);
-                    alert("There was an error fetching sublinks.");
-                });
-        }
-    </script>
-
 </body>
+
 </html>

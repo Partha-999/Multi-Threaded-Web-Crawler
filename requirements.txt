@@ -4,3 +4,5 @@ Flask==2.0.2
 plotly==5.5.0
 psutil
 pyyaml
+kafka-python==2.0.2
+elasticsearch==8.17.1
