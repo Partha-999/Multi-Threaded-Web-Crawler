@@ -114,9 +114,9 @@ A distributed, scalable web crawler and search engine built using Kafka, Elastic
 🚀 Future Improvements
 ----------------------
 
-   PageRank-based ranking algorithm
-   Autocomplete suggestions
-   Redis caching layer
+   PageRank-based ranking algorithm,
+   Autocomplete suggestions,
+   Redis caching layer,
    Kubernetes deployment for auto-scaling
 
 
