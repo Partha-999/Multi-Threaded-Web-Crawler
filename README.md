@@ -52,48 +52,11 @@ The architecture focuses on scalability, fault recovery, and distributed systems
 
 ---
 
-# Architecture
+# System Architecture
+![Distributed Web Crawler Architecture](screenshots/Architecture.png)
 
-```text
-                +----------------------+
-                |   Seed URLs          |
-                +----------+-----------+
-                           |
-                           v
-                +----------------------+
-                | Redis Frontier Queue |
-                |----------------------|
-                | BFS Queue            |
-                | Visited Set          |
-                | Inflight Lease Set   |
-                +----------+-----------+
-                           |
-          +----------------+----------------+
-          |                                 |
-          v                                 v
-+-------------------+         +-------------------+
-| Crawler Worker 1  |         | Crawler Worker N  |
-| Multi-threaded    |         | Multi-threaded    |
-+---------+---------+         +---------+---------+
-          |                             |
-          +-------------+---------------+
-                        |
-                        v
-             +-------------------+
-             | Kafka URL Stream  |
-             | Batch Publishing  |
-             +---------+---------+
-                       |
-                       v
-             +-------------------+
-             | Elasticsearch     |
-             | Bulk Indexing     |
-             +---------+---------+
-                       |
-                       v
-             +-------------------+
-             | Flask Search UI   |
-             +-------------------+
+The system uses a Redis-backed distributed crawl frontier with lease-based task coordination, horizontally scalable crawler workers, Kafka-based batch URL streaming, and Elasticsearch bulk indexing for low-latency search retrieval.
+
 ```
 
 ---
