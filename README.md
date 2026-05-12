@@ -143,7 +143,7 @@ The architecture focuses on scalability, fault recovery, and distributed systems
 | Metric | Result |
 |---|---|
 | Indexed Documents | 12,291+ |
-| Discovered URLs | 1,582,763+ |
+| Discovered URLs | 15,82,763+ |
 | Search Latency | <100ms average |
 | Crawl Workers | Multi-worker |
 | Queue Coordination | Redis-backed persistent frontier |
