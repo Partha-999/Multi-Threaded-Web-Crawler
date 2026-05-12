@@ -1,126 +1,274 @@
-🚀 Distributed Web Search Engine (Mini Google)
-==============================================
+# Distributed Web Crawling & Search Infrastructure
 
-🌐 Overview
------------
+A production-oriented distributed web crawling and search infrastructure inspired by large-scale search engine architectures. The system is designed to simulate scalable web crawling workflows using Redis-backed frontier management, Kafka-based distributed URL streaming, Elasticsearch bulk indexing, and horizontally scalable crawler workers.
 
-A distributed, scalable web crawler and search engine built using Kafka, Elasticsearch, and Python, capable of indexing thousands of web pages and serving fast, relevant search results.
+---
 
-  
+# Overview
 
-🧠 Key Highlights
------------------
+This project implements a distributed crawling pipeline capable of:
 
-   ⚡ Kafka-based distributed crawling
-   🔍 Elasticsearch full-text search engine
-   🚀 Indexed 11,000+ pages
-   🧵 Multi-threaded crawling for performance optimization
-   📊 Real-time system monitoring (CPU & Memory)
-   🧹 Intelligent URL filtering and deduplication
-   🌍 Crawls trusted domains (Wikipedia, Arxiv, .edu)
+- Large-scale crawl frontier management
+- Distributed URL discovery and processing
+- Fault-tolerant crawl coordination
+- Bulk-based search indexing
+- Persistent queue recovery
+- Multi-worker crawl execution
+- Real-time crawl monitoring
+- Low-latency full-text search
 
-  
+The architecture focuses on scalability, fault recovery, and distributed systems concepts commonly used in modern backend infrastructure.
 
-🏗 System Architecture
-----------------------
+---
 
-    Crawler Workers (Multi-threaded)
-            ↓
-    Kafka (Distributed URL Queue)
-            ↓
-    Elasticsearch (Search Index)
-            ↓
-    Flask (Search UI)
-    
+# Key Features
 
-⚙️ Tech Stack
--------------
+## Distributed Crawl Frontier
+- Redis-backed persistent BFS crawl frontier
+- URL deduplication using distributed sets
+- Inflight task leasing and worker recovery
+- Persistent crawl-state coordination
 
-| Layer         | Technology               |
-| ------------- | ------------------------ |
-| Backend       | Python (Flask)           |
-| Queue         | Apache Kafka             |
-| Search Engine | Elasticsearch            |
-| Crawling      | Requests + BeautifulSoup |
-| Deployment    | Docker                   |
+## Distributed URL Streaming
+- Kafka-based batch URL publishing
+- Distributed crawl event propagation
+- Batched producer workflows for throughput optimization
 
+## Elasticsearch Search Infrastructure
+- Full-text indexing using Elasticsearch
+- Bulk API indexing pipelines
+- Optimized low-latency search retrieval
+- Multi-field search support
 
-📈 Performance Metrics
-----------------------
+## Fault Tolerance
+- Worker crash recovery using lease expiration
+- Stale-task requeueing
+- Persistent queue state across crawler restarts
 
-   📄 Indexed: 1M+ pages
-   ⚡ Search latency: <100ms
-   🧠 CPU usage optimized to 10–20%
-   🔄 Parallel crawling using multi-threading + Kafka workers
-   ⏱️ System uptime 99.95%.
-  
+## Scalable Worker Architecture
+- Horizontally scalable crawler workers
+- Multi-threaded crawl execution
+- Batch-oriented crawl processing pipelines
 
-🚀 Features
------------
+---
 
- 🔹 Distributed Crawling
+# Architecture
 
-   Multiple crawler workers running in parallel
-   Kafka handles URL distribution
+```text
+                +----------------------+
+                |   Seed URLs          |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                | Redis Frontier Queue |
+                |----------------------|
+                | BFS Queue            |
+                | Visited Set          |
+                | Inflight Lease Set   |
+                +----------+-----------+
+                           |
+          +----------------+----------------+
+          |                                 |
+          v                                 v
++-------------------+         +-------------------+
+| Crawler Worker 1  |         | Crawler Worker N  |
+| Multi-threaded    |         | Multi-threaded    |
++---------+---------+         +---------+---------+
+          |                             |
+          +-------------+---------------+
+                        |
+                        v
+             +-------------------+
+             | Kafka URL Stream  |
+             | Batch Publishing  |
+             +---------+---------+
+                       |
+                       v
+             +-------------------+
+             | Elasticsearch     |
+             | Bulk Indexing     |
+             +---------+---------+
+                       |
+                       v
+             +-------------------+
+             | Flask Search UI   |
+             +-------------------+
+```
 
- 🔹 Smart Filtering
+---
 
-   Removes junk URLs (login, edit, special pages)
-   Domain restriction for quality results
+# Tech Stack
 
- 🔹 Search Engine
+| Layer | Technology |
+|---|---|
+| Backend | Python |
+| Crawl Parsing | Requests, BeautifulSoup |
+| Distributed Queue | Redis |
+| URL Streaming | Apache Kafka |
+| Search Engine | Elasticsearch |
+| Frontend | Flask |
+| Containerization | Docker |
+| Orchestration | Kubernetes |
 
-   Multi-field search (title + content)
-   Relevant ranking using Elasticsearch
+---
 
- 🔹 Monitoring
+# Distributed Systems Concepts Implemented
 
-   Real-time CPU & memory tracking
+- Distributed crawl frontier management
+- Persistent queue coordination
+- Lease-based task ownership
+- Worker recovery workflows
+- Crawl-state persistence
+- Distributed URL propagation
+- Bulk indexing pipelines
+- Horizontal worker scaling
+- Queue deduplication
+- Frontier graph expansion
+- Fault-tolerant crawl recovery
 
-  
+---
 
-▶️ How to Run
--------------
+# Benchmark Results
 
- 1️⃣ Start services
+## Benchmark Environment
+- Multi-worker distributed crawler execution
+- Redis-backed persistent frontier
+- Elasticsearch bulk indexing
+- Kafka batch publishing
+- Dockerized infrastructure deployment
 
-    docker-compose up -d
-    
+## Observed Results
 
- 2️⃣ Run crawler (multiple terminals)
+| Metric | Result |
+|---|---|
+| Indexed Documents | 12,291+ |
+| Discovered URLs | 1,582,763+ |
+| Search Latency | <100ms average |
+| Crawl Workers | Multi-worker |
+| Queue Coordination | Redis-backed persistent frontier |
+| Fault Recovery | Lease-based task recovery |
 
-    python crawler.py
-    
+---
 
- 3️⃣ Start search UI
+# Performance Highlights
 
-    python app.py
-    
+- Supported large-scale crawl frontier simulations exceeding 1.5M discovered URLs
+- Indexed 12K+ searchable documents using Elasticsearch bulk indexing
+- Maintained persistent crawl-state recovery using Redis inflight leasing
+- Implemented batch-oriented Kafka URL streaming pipelines
+- Enabled scalable distributed crawl execution using multi-worker architecture
 
- 4️⃣ Open browser
+---
 
-    http://localhost:5000
-    
+# Fault Tolerance Design
 
-🔍 Example Queries
-------------------
+The crawler infrastructure implements fault-tolerant coordination through:
 
-   machine learning,
-   president of india,
-   newton laws,
-   data structures
+- Redis-backed inflight task leasing
+- Lease expiration recovery
+- Stale worker requeueing
+- Persistent distributed frontier state
+- Restart-safe crawl workflows
 
+This enables crawler workers to recover gracefully from failures without losing crawl-state consistency.
 
-🚀 Future Improvements
-----------------------
+---
 
-   PageRank-based ranking algorithm,
-   Autocomplete suggestions,
-   Redis caching layer,
-   Kubernetes deployment for auto-scaling
+# Search Features
 
+- Full-text search
+- Title + content indexing
+- Elasticsearch BM25 ranking
+- Low-latency retrieval
+- Distributed indexing workflows
 
-👨‍💻 Author
-------------
+---
+
+# Example Queries
+
+- machine learning
+- distributed systems
+- artificial intelligence
+- operating systems
+- computer networks
+
+---
+
+# Future Improvements
+
+- Async crawler pipelines using aiohttp + asyncio
+- Adaptive frontier throttling
+- Crawl prioritization algorithms
+- Domain-aware scheduling
+- PageRank-based ranking
+- Prometheus + Grafana observability
+- Kubernetes autoscaling
+- Distributed shard-aware indexing
+- Robots.txt compliance
+- Crawl politeness policies
+
+---
+
+# Running the Project
+
+## Start Infrastructure
+
+```bash
+docker-compose up -d
+```
+
+## Start Redis
+
+```bash
+docker run -d --name redis-stack -p 6379:6379 redis
+```
+
+## Start Multiple Crawler Workers
+
+```bash
+python crawler.py
+```
+
+Run multiple crawler workers in separate terminals.
+
+## Start Search UI
+
+```bash
+python app.py
+```
+
+Open:
+
+```text
+http://localhost:5000
+```
+
+---
+
+# Screenshots
+
+## Elasticsearch Benchmark
+![Elasticsearch Benchmark](screenshots/Elasticsearch.png)
+
+## Redis Frontier Metrics
+![Redis Metrics](screenshots/Redis.png)
+
+---
+
+# Engineering Focus
+
+This project focuses heavily on:
+- Distributed systems engineering
+- Backend infrastructure design
+- Fault-tolerant queue coordination
+- Search infrastructure
+- Crawl scalability
+- Distributed workload execution
+- Persistent frontier management
+
+---
+
+# Author
 
 Parthasarathi Sadanala

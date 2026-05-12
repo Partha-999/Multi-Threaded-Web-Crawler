@@ -7,16 +7,25 @@ crawler:
     - "https://en.wikipedia.org/wiki/India"
     - "https://en.wikipedia.org/wiki/Artificial_intelligence"
     - "https://en.wikipedia.org/wiki/World_War_II"
-  max_pages: 10000
-  num_threads: 20
+  max_pages: 1000000
+  num_threads: 32
   max_depth: 3
   retry_attempts: 3
+  worker_batch_size: 25
 
 kafka:
   bootstrap_servers: "localhost:9092"
   topic: "crawl-urls"
   group_id: "crawler-workers"
+  batch_size: 25
 
 elasticsearch:
-  hosts: "http://localhost:9200"
+  hosts:
+    - "http://localhost:9200"
   index: "web_pages"
+  bulk_size: 500
+
+redis:
+  url: "redis://localhost:6379/0"
+  namespace: "crawler"
+  lease_seconds: 300

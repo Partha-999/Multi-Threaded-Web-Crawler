@@ -1,220 +1,295 @@
+import json
+import logging
+import os
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urljoin, urlparse
+
+import psutil
 import requests
 from bs4 import BeautifulSoup
-import time
-import logging
-from collections import deque
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from urllib.parse import urljoin, urlparse
-import threading
-import psutil
 
 from distributed_pipeline import DistributedSearchPipeline
+from frontier import URLFrontier
 from settings import load_config
 
 config = load_config()
-start_urls = config["crawler"].get("start_urls", [config["crawler"].get("start_url")])
+start_urls = config["crawler"]["start_urls"]
 max_pages = int(config["crawler"]["max_pages"])
-num_threads = int(config["crawler"]["num_threads"])
 max_depth = int(config["crawler"]["max_depth"])
 retry_attempts = int(config["crawler"]["retry_attempts"])
+worker_batch_size = int(config["crawler"].get("worker_batch_size", 25))
+num_threads = int(config["crawler"].get("num_threads", 20))
+lease_seconds = int(config["redis"].get("lease_seconds", 300))
 
 VALID_DOMAINS = ["wikipedia.org", "arxiv.org", ".edu"]
+JUNK_PATTERNS = [
+    "login",
+    "signin",
+    "signup",
+    "register",
+    "special:",
+    "user:",
+    "user_talk:",
+    "talk:",
+    "edit",
+    "history",
+    "file:",
+    "category:",
+]
 
-# Logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        payload = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "message": record.getMessage(),
+        }
+        for key in (
+            "worker_id",
+            "url",
+            "depth",
+            "queue_size",
+            "inflight_size",
+            "indexed_rate",
+            "batch_size",
+            "pages_crawled",
+        ):
+            value = record.__dict__.get(key)
+            if value is not None:
+                payload[key] = value
+        return json.dumps(payload, ensure_ascii=False)
+
+
+handler = logging.StreamHandler()
+handler.setFormatter(JsonFormatter())
+logger = logging.getLogger("crawler")
+logger.setLevel(logging.INFO)
+logger.handlers = [handler]
+logger.propagate = False
+
+frontier = URLFrontier(
+    redis_url=config["redis"]["url"],
+    namespace=config["redis"]["namespace"],
 )
-logger = logging.getLogger()
+pipeline = DistributedSearchPipeline(config)
+_thread_local = threading.local()
 
 
-# ✅ Fetch page
-def fetch_page(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
+def get_session():
+    session = getattr(_thread_local, "session", None)
+    if session is None:
+        session = requests.Session()
+        session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (compatible; MiniSearchBot/1.0; +https://example.com/bot)",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+        )
+        _thread_local.session = session
+    return session
 
+
+def clean_url(url):
+    return url.split("#")[0].rstrip("/")
+
+
+def is_valid_url(url):
+    if not url:
+        return False
+
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        return False
+
+    netloc = parsed.netloc.lower()
+    if not netloc:
+        return False
+
+    return any(domain in netloc for domain in VALID_DOMAINS)
+
+
+def is_junk_url(url):
+    lowered = url.lower()
+    return any(pattern in lowered for pattern in JUNK_PATTERNS)
+
+
+def fetch_page(url, depth):
+    session = get_session()
     for attempt in range(retry_attempts):
         try:
-            response = requests.get(url, headers=headers, timeout=5)
+            response = session.get(url, timeout=(5, 20))
             response.raise_for_status()
             return response.text
-        except requests.RequestException as e:
-            logger.error(f"Error fetching {url}: {e} (Attempt {attempt+1})")
-            time.sleep(2**attempt)
+        except requests.RequestException:
+            wait_time = 2**attempt
+            logger.warning(
+                "fetch_retry",
+                extra={
+                    "url": url,
+                    "depth": depth,
+                    "queue_size": frontier.queue_size(),
+                    "batch_size": attempt + 1,
+                },
+            )
+            time.sleep(wait_time)
     return None
 
 
-# ✅ Clean URL (remove fragments and junk)
-def clean_url(url):
-    """Remove fragments and trailing slashes"""
-    clean = url.split("#")[0]
-    if clean.endswith("/"):
-        clean = clean[:-1]
-    return clean
-
-
-# ✅ Validate domain
-def is_valid_url(url):
-    """Only crawl trusted domains"""
-    if not url:
-        return False
-    url_lower = url.lower()
-    return any(domain in url_lower for domain in VALID_DOMAINS)
-
-
-# ✅ Filter junk URLs
-def is_junk_url(url):
-    """Skip login pages, special pages, anchors"""
-    junk_patterns = [
-        "login",
-        "signin",
-        "signup",
-        "register",
-        "special:",
-        "wikipedia:talk",
-        "user:",
-        "user_talk:",
-        "wikipedia:sandbox",
-        "edit",
-        "history",
-        "talk:",
-    ]
-    url_lower = url.lower()
-    return any(pattern in url_lower for pattern in junk_patterns)
-
-
-# ✅ Parse HTML
 def parse_page(content, url):
     soup = BeautifulSoup(content, "html.parser")
-    title = soup.title.string if soup.title else "No Title"
-    text = soup.get_text()
-    raw_links = [urljoin(url, a["href"]) for a in soup.find_all("a", href=True)]
-
-    # Filter: clean, validate domain, skip junk
+    title = (
+        soup.title.string.strip() if soup.title and soup.title.string else "No Title"
+    )
+    text = soup.get_text(" ", strip=True)
     links = []
-    for link in raw_links:
-        clean = clean_url(link)
-        if is_valid_url(clean) and not is_junk_url(clean):
-            links.append(clean)
 
-    return title, text, list(set(links))  # deduplicate
+    for anchor in soup.find_all("a", href=True):
+        link = clean_url(urljoin(url, anchor["href"]))
+        if not is_valid_url(link) or is_junk_url(link):
+            continue
+        links.append(link)
 
-
-# ✅ Store in Elasticsearch
-def store_page(pipeline, url, title, content, links):
-    pipeline.index_page(url, title, content, links)
+    return title, text, list(dict.fromkeys(links))
 
 
-# ✅ Worker function
-def crawl_page(url, depth, pipeline):
+def crawl_item(item, worker_id):
+    payload = item["_payload"]
+    url = item["url"]
+    depth = int(item.get("depth", 0))
+
     if depth > max_depth:
-        return [], 0
-
-    logger.info(f"Fetching {url}")
-
-    html = fetch_page(url)
-    if not html:
-        return [], 0
-
-    title, content, links = parse_page(html, url)
-    store_page(pipeline, url, title, content, links)
-
-    return links, len(content)
-
-
-# ✅ Monitor system
-def log_system_usage():
-    while True:
-        cpu = psutil.cpu_percent(interval=1)
-        mem = psutil.virtual_memory().percent
-        logger.info(f"CPU: {cpu}% | Memory: {mem}%")
-        time.sleep(5)
-
-
-# ✅ MAIN CRAWLER (Distributed via Kafka)
-def crawl(start_urls, max_pages, num_threads):
-    pipeline = DistributedSearchPipeline(config)
-
-    visited_urls = set()
-    pending_urls = deque()
-
-    # Publish all seed URLs to Kafka
-    logger.info(f"Publishing {len(start_urls)} seed URLs to Kafka...")
-    for url in start_urls:
-        clean = clean_url(url)
-        if is_valid_url(clean) and not is_junk_url(clean):
-            pipeline.publish_urls([{"url": clean, "depth": 0}])
-            pending_urls.append((clean, 0))
-
-    total_bytes = 0
-    start_time = time.time()
-
-    # system monitor thread
-    threading.Thread(target=log_system_usage, daemon=True).start()
+        frontier.acknowledge(payload, url)
+        return 0, 0
 
     logger.info(
-        f"Starting crawler with {num_threads} threads, target: {max_pages} pages"
+        "crawl_url",
+        extra={
+            "worker_id": worker_id,
+            "url": url,
+            "depth": depth,
+            "queue_size": frontier.queue_size(),
+            "inflight_size": frontier.inflight_size(),
+            "indexed_rate": 0,
+        },
     )
 
-    with ThreadPoolExecutor(max_workers=num_threads) as executor:
-        futures = set()
-        lock = threading.Lock()
-        idle_rounds = 0
+    html = fetch_page(url, depth)
+    if not html:
+        frontier.acknowledge(payload, url)
+        return 0, 0
 
-        while len(visited_urls) < max_pages:
+    title, content, links = parse_page(html, url)
+    pipeline.index_page(url, title, content, links)
 
-            # 🔥 Consume from Kafka
-            message = pipeline.next_url(timeout_ms=500)
-            if message:
-                url = message.get("url")
-                depth = int(message.get("depth", 0))
-                if url and is_valid_url(url) and not is_junk_url(url):
-                    pending_urls.append((url, depth))
-                idle_rounds = 0
-            else:
-                idle_rounds += 1
+    next_items = [{"url": link, "depth": depth + 1} for link in links]
+    if next_items:
+        frontier.enqueue_many(next_items)
+        pipeline.publish_urls(next_items)
 
-            # 🔥 Fill threads
-            while pending_urls and len(futures) < num_threads:
-                url, depth = pending_urls.popleft()
+    frontier.acknowledge(payload, url)
+    return len(content), len(links)
 
-                with lock:
-                    if url in visited_urls:
-                        continue
-                    visited_urls.add(url)
 
-                logger.info(f"[{len(visited_urls)}/{max_pages}] Processing: {url}")
+def monitor_system():
+    while True:
+        logger.info(
+            "system_usage",
+            extra={
+                "queue_size": frontier.queue_size(),
+                "inflight_size": frontier.inflight_size(),
+                "pages_crawled": frontier.visited_count(),
+                "indexed_rate": 0,
+            },
+        )
+        psutil.cpu_percent(interval=1)
+        time.sleep(4)
 
-                future = executor.submit(crawl_page, url, depth, pipeline)
-                future.depth = depth
-                futures.add(future)
 
-            # 🔥 Process completed tasks
-            if futures:
-                done, futures = wait(futures, timeout=0, return_when=FIRST_COMPLETED)
+def seed_frontier():
+    if not frontier.is_empty():
+        return
 
-                for future in done:
-                    links, size = future.result()
-                    total_bytes += size
+    seed_items = [
+        {"url": clean_url(url), "depth": 0} for url in start_urls if is_valid_url(url)
+    ]
+    if seed_items:
+        frontier.enqueue_many(seed_items)
+        pipeline.publish_urls(seed_items)
+        logger.info(
+            "seeded_frontier",
+            extra={
+                "queue_size": frontier.queue_size(),
+                "inflight_size": frontier.inflight_size(),
+                "pages_crawled": frontier.visited_count(),
+                "batch_size": len(seed_items),
+            },
+        )
 
-                    current_depth = future.depth
 
-                    for link in links:
-                        pending_urls.append((link, current_depth + 1))
+def crawl_worker(worker_id):
+    processed = 0
+    started_at = time.time()
 
-            # 🔥 If nothing to do
-            if not pending_urls and not futures and idle_rounds >= 3:
-                logger.info("Queue empty, stopping consumer...")
+    while frontier.visited_count() < max_pages:
+        frontier.requeue_stale(lease_seconds)
+        batch = frontier.reserve_batch(
+            worker_id, batch_size=worker_batch_size, lease_seconds=lease_seconds
+        )
+
+        if not batch:
+            if frontier.is_empty():
                 break
+            time.sleep(1)
+            continue
+
+        with ThreadPoolExecutor(max_workers=min(num_threads, len(batch))) as executor:
+            futures = {
+                executor.submit(crawl_item, item, worker_id): item for item in batch
+            }
+            batch_processed = 0
+
+            for future in as_completed(futures):
+                future.result()
+                batch_processed += 1
+
+        processed += batch_processed
+        pipeline.flush_bulk()
+        pipeline.flush_urls()
+
+        elapsed = max(time.time() - started_at, 1)
+        rate = round(processed / elapsed, 2)
+
+        logger.info(
+            "crawl_batch_complete",
+            extra={
+                "worker_id": worker_id,
+                "batch_size": len(batch),
+                "queue_size": frontier.queue_size(),
+                "inflight_size": frontier.inflight_size(),
+                "pages_crawled": frontier.visited_count(),
+                "indexed_rate": rate,
+            },
+        )
+
+        if frontier.visited_count() >= max_pages:
+            break
+
+
+def main():
+    seed_frontier()
+
+    monitor_thread = threading.Thread(target=monitor_system, daemon=True)
+    monitor_thread.start()
+
+    worker_id = f"worker-{os.getpid()}-{threading.get_ident()}"
+    crawl_worker(worker_id)
 
     pipeline.close()
-
-    elapsed = round(time.time() - start_time, 2)
-    logger.info(f"\n✅ CRAWL COMPLETE")
-    logger.info(f"Pages indexed: {len(visited_urls)}")
-    logger.info(f"Total data: {total_bytes} bytes")
-    logger.info(f"Time: {elapsed}s")
-    logger.info(f"Rate: {round(len(visited_urls) / elapsed, 2)} pages/sec")
+    frontier.close()
 
 
-# ENTRY - Support both single and multiple seed URLs
 if __name__ == "__main__":
-    crawl(start_urls, max_pages, num_threads)
+    main()

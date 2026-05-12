@@ -1,106 +1,104 @@
 from datetime import datetime
 import json
 
-try:
-    from elasticsearch import Elasticsearch
-except ImportError:
-    Elasticsearch = None
-
-try:
-    from kafka import KafkaConsumer, KafkaProducer
-except ImportError:
-    KafkaConsumer = None
-    KafkaProducer = None
+from elasticsearch import Elasticsearch
+from elasticsearch.helpers import bulk
+from kafka import KafkaProducer
 
 
 class DistributedSearchPipeline:
     def __init__(self, config):
-        if Elasticsearch is None or KafkaConsumer is None or KafkaProducer is None:
-            raise RuntimeError(
-                "Install elasticsearch and kafka-python to run the distributed pipeline."
-            )
-
         self.kafka_config = config["kafka"]
-        self.elasticsearch_config = config["elasticsearch"]
-        self.topic = self.kafka_config["topic"]
-        self.index_name = self.elasticsearch_config["index"]
-        self.es = Elasticsearch(
-            [self.elasticsearch_config["hosts"]], request_timeout=30, verify_certs=False
-        )
+        self.es_config = config["elasticsearch"]
+
+        self.kafka_topic = self.kafka_config["topic"]
+        self.kafka_batch_size = int(self.kafka_config.get("batch_size", 25))
+        self.index_name = self.es_config["index"]
+        self.bulk_size = int(self.es_config.get("bulk_size", 500))
+
+        self.es = Elasticsearch(self.es_config["hosts"], request_timeout=30)
         self.producer = KafkaProducer(
             bootstrap_servers=self.kafka_config["bootstrap_servers"],
             value_serializer=lambda value: json.dumps(value).encode("utf-8"),
+            linger_ms=100,
+            acks="all",
         )
-        self.consumer = KafkaConsumer(
-            self.topic,
-            bootstrap_servers=self.kafka_config["bootstrap_servers"],
-            auto_offset_reset="earliest",
-            enable_auto_commit=True,
-            value_deserializer=lambda value: json.loads(value.decode("utf-8")),
-        )
-        self.ensure_index()
 
-    def ensure_index(self):
-        try:
-            if not self.es.indices.exists(index=self.index_name):
-                self.es.indices.create(
-                    index=self.index_name,
-                    mappings={
-                        "properties": {
-                            "url": {"type": "keyword"},
-                            "title": {"type": "text"},
-                            "content": {"type": "text"},
-                            "links": {"type": "keyword"},
-                            "fetched_at": {"type": "date"},
-                        }
-                    },
-                )
-        except Exception as e:
-            print("Index check failed, creating index anyway...")
+        self.url_buffer = []
+        self.document_buffer = []
+
+        self.create_index()
+
+    def create_index(self):
+        if self.es.indices.exists(index=self.index_name):
+            return
+
         self.es.indices.create(
-            index=self.index_name, ignore=400  # ignore "already exists"
-        )
-
-    def index_page(self, url, title, content, links):
-        self.es.index(
             index=self.index_name,
-            id=url,
-            document={
-                "url": url,
-                "title": title,
-                "content": content,
-                "links": links,
-                "fetched_at": datetime.utcnow().isoformat(),
+            mappings={
+                "properties": {
+                    "url": {"type": "keyword"},
+                    "title": {"type": "text"},
+                    "content": {"type": "text"},
+                    "links": {"type": "keyword"},
+                    "fetched_at": {"type": "date"},
+                }
             },
-            refresh=False,
         )
 
     def publish_urls(self, urls):
-        for url in urls:
-            if not url:
-                continue
-            if isinstance(url, dict):
-                payload = url
-            else:
-                payload = {"url": url, "depth": 0}
-            self.producer.send(self.topic, value=payload)
+        for item in urls:
+            payload = item if isinstance(item, dict) else {"url": item, "depth": 0}
+            self.url_buffer.append(payload)
+
+            if len(self.url_buffer) >= self.kafka_batch_size:
+                self.flush_urls()
+
+    def flush_urls(self):
+        if not self.url_buffer:
+            return
+
+        while self.url_buffer:
+            batch = self.url_buffer[: self.kafka_batch_size]
+            self.url_buffer = self.url_buffer[self.kafka_batch_size :]
+            self.producer.send(
+                self.kafka_topic,
+                {
+                    "items": batch,
+                    "batch_size": len(batch),
+                    "published_at": datetime.utcnow().isoformat(),
+                },
+            )
+
         self.producer.flush()
 
-    def next_url(self, timeout_ms=1000):
-        records = self.consumer.poll(timeout_ms=timeout_ms)
+    def index_page(self, url, title, content, links):
+        self.document_buffer.append(
+            {
+                "_index": self.index_name,
+                "_id": url,
+                "_source": {
+                    "url": url,
+                    "title": title,
+                    "content": content,
+                    "links": links,
+                    "fetched_at": datetime.utcnow().isoformat(),
+                },
+            }
+        )
 
-        for partition_records in records.values():
-            for record in partition_records:
-                try:
-                    data = record.value
-                    if isinstance(data, str):
-                        data = json.loads(data)
-                    return data
-                except Exception as e:
-                    print("Error parsing message:", e)
+        if len(self.document_buffer) >= self.bulk_size:
+            self.flush_bulk()
 
-        return None
+    def flush_bulk(self):
+        if not self.document_buffer:
+            return
+
+        bulk(self.es, self.document_buffer, refresh=False)
+        self.document_buffer = []
 
     def close(self):
-        self.consumer.close()
+        self.flush_urls()
+        self.flush_bulk()
         self.producer.close()
+        self.es.close()
