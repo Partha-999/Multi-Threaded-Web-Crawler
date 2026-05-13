@@ -20,3 +20,10 @@ __pycache__/
 # OS Files
 .DS_Store
 Thumbs.db
+# Large crawler datasets
+web_pages.json
+*.jsonl
+*.ndjson
+
+# Elasticsearch exports
+elasticdump*
