@@ -19,6 +19,12 @@ DEFAULT_CONFIG = {
         "max_depth": 3,
         "retry_attempts": 3,
         "worker_batch_size": 25,
+        # politeness / stability defaults
+        "max_frontier_queue_size": 200000,
+        "priority_enabled": True,
+        "domain_max_requests_default": 1000,
+        "per_domain_delay_seconds": 2,
+        "robots_ttl_seconds": 3600,
     },
     "kafka": {
         "bootstrap_servers": "localhost:9092",
@@ -35,6 +41,11 @@ DEFAULT_CONFIG = {
         "url": "redis://localhost:6379/0",
         "namespace": "crawler",
         "lease_seconds": 300,
+    },
+    # domain-level defaults
+    "domains": {
+        # per-domain explicit budgets: {'en.wikipedia.org': 10000}
+        "budgets": {},
     },
 }
 

@@ -1,6 +1,6 @@
-# Distributed Web Crawling & Search Infrastructure
+# Distributed Web Search Engine
 
-A production-oriented distributed web crawling and search infrastructure inspired by large-scale search engine architectures. The system is designed to simulate scalable web crawling workflows using Redis-backed frontier management, Kafka-based distributed URL streaming, Elasticsearch bulk indexing, and horizontally scalable crawler workers.
+A distributed web crawling and search infrastructure inspired by large-scale search engine architectures and modern search backend systems. The system is designed to simulate scalable web crawling workflows using Redis-backed frontier management, Kafka-based distributed URL streaming, Elasticsearch bulk indexing, and horizontally scalable crawler workers.
 
 ---
 
@@ -57,8 +57,19 @@ The architecture focuses on scalability, fault recovery, and distributed systems
 
 The system uses a Redis-backed distributed crawl frontier with lease-based task coordination, horizontally scalable crawler workers, Kafka-based batch URL streaming, and Elasticsearch bulk indexing for low-latency search retrieval.
 
-```
+# Distributed Infrastructure
 
+The search engine runs on a fully containerized distributed stack using:
+
+- Elasticsearch
+- Kafka
+- Redis
+- Zookeeper
+- Multi-threaded crawler workers
+
+### Live Container Runtime
+
+![Docker Infrastructure](./screenshots/docker-runtime.png)
 ---
 
 # Tech Stack
@@ -71,8 +82,7 @@ The system uses a Redis-backed distributed crawl frontier with lease-based task 
 | URL Streaming | Apache Kafka |
 | Search Engine | Elasticsearch |
 | Frontend | Flask |
-| Containerization | Docker |
-| Orchestration | Kubernetes |
+| Containerization & Orchestration | Docker, Kubernetes (planned/experimental) |
 
 ---
 
@@ -105,8 +115,10 @@ The system uses a Redis-backed distributed crawl frontier with lease-based task 
 
 | Metric | Result |
 |---|---|
-| Indexed Documents | 12,291+ |
-| Discovered URLs | 1,582,763+ |
+| Indexed Documents | 26,674+ |
+| Discovered URLs | 1,800,000+ |
+| Search Backend | Elastic Cloud |
+| Deployment | Render + Elastic Cloud |
 | Search Latency | <100ms average |
 | Crawl Workers | Multi-worker |
 | Queue Coordination | Redis-backed persistent frontier |
@@ -116,8 +128,8 @@ The system uses a Redis-backed distributed crawl frontier with lease-based task 
 
 # Performance Highlights
 
-- Supported large-scale crawl frontier simulations exceeding 1.5M discovered URLs
-- Indexed 12K+ searchable documents using Elasticsearch bulk indexing
+- Supported large-scale crawl frontier simulations exceeding 1.8M discovered URLs
+- Indexed 26K+ searchable documents using Elasticsearch bulk indexing
 - Maintained persistent crawl-state recovery using Redis inflight leasing
 - Implemented batch-oriented Kafka URL streaming pipelines
 - Enabled scalable distributed crawl execution using multi-worker architecture
@@ -145,6 +157,11 @@ This enables crawler workers to recover gracefully from failures without losing 
 - Elasticsearch BM25 ranking
 - Low-latency retrieval
 - Distributed indexing workflows
+- Fuzzy search support
+- BM25 relevance scoring
+- Multi-field ranking
+- Cloud-hosted Elasticsearch infrastructure
+- Distributed search serving
 
 ---
 
@@ -170,6 +187,24 @@ This enables crawler workers to recover gracefully from failures without losing 
 - Distributed shard-aware indexing
 - Robots.txt compliance
 - Crawl politeness policies
+
+---
+# Cloud Deployment
+
+The distributed search infrastructure is deployed using:
+
+- Render (Flask search service hosting)
+- Elastic Cloud (managed Elasticsearch cluster)
+- Dockerized local crawling infrastructure
+- Redis-backed persistent crawl frontier
+- Kafka-based distributed URL streaming
+
+The production deployment separates:
+- crawl infrastructure
+- indexing infrastructure
+- search serving infrastructure
+
+This architecture mirrors real-world distributed search system design patterns.
 
 ---
 

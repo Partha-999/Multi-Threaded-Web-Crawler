@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: distributed-search-engine
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class eventlet -w 1 app:app

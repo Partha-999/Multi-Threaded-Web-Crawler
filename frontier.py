@@ -6,25 +6,52 @@ import redis
 
 
 class URLFrontier:
-    def __init__(self, redis_url="redis://localhost:6379/0", namespace="crawler"):
+    def __init__(
+        self,
+        redis_url="redis://localhost:6379/0",
+        namespace="crawler",
+        config=None,
+    ):
         self.redis = redis.Redis.from_url(redis_url, decode_responses=True)
         self.queue_key = f"{namespace}:queue"
+        self.queue_zkey = f"{namespace}:queue_z"
         self.visited_key = f"{namespace}:visited"
         self.discovered_key = f"{namespace}:discovered"
         self.inflight_key = f"{namespace}:inflight"
-        self.lease_seconds = 300
-        self._reserve_script = self.redis.register_script("""
-local queue_key = KEYS[1]
-local inflight_key = KEYS[2]
-local meta_json = ARGV[1]
+        self.domain_stats_key = f"{namespace}:domain_stats"
+        self.domain_last_key = f"{namespace}:domain_last"
+        self.robots_key_prefix = f"{namespace}:robots"
 
-local item = redis.call('LPOP', queue_key)
-if not item then
-    return nil
+        cfg = config or {}
+        self.lease_seconds = int(cfg.get("lease_seconds", 300))
+        self.priority_enabled = bool(cfg.get("priority_enabled", True))
+        self.max_frontier_queue_size = int(cfg.get("max_frontier_queue_size", 200000))
+        self.domain_max_requests_default = int(
+            cfg.get("domain_max_requests_default", 1000)
+        )
+
+        # Reserve script: pop from zset (lowest score) if present, else list LPOP
+        self._reserve_script = self.redis.register_script("""
+local zkey = KEYS[1]
+local lkey = KEYS[2]
+local inflight = KEYS[3]
+local meta = ARGV[1]
+
+local res = nil
+local zitems = redis.call('ZRANGE', zkey, 0, 0)
+if zitems and #zitems > 0 then
+  res = zitems[1]
+  redis.call('ZREM', zkey, res)
+else
+  res = redis.call('LPOP', lkey)
 end
 
-redis.call('HSET', inflight_key, item, meta_json)
-return item
+if not res then
+  return nil
+end
+
+redis.call('HSET', inflight, res, meta)
+return res
 """)
         self.redis.ping()
 
@@ -36,35 +63,82 @@ return item
         normalized = urlunsplit(parsed._replace(fragment=""))
         return normalized.rstrip("/")
 
-    def enqueue(self, url, depth=0):
+    def _domain_from_url(self, url):
+        try:
+            return urlsplit(url).netloc.lower()
+        except Exception:
+            return ""
+
+    def enqueue(self, url, depth=0, score=None, domain_budget_map=None):
+        """Enqueue a single url. Returns (status, message).
+
+        status: 'added', 'exists', 'visited', 'throttled', 'dropped', 'domain_budget_exceeded'
+        """
         normalized = self.normalize_url(url)
         if not normalized:
-            return False
+            return "dropped", "empty_url"
 
         if self.redis.sismember(self.visited_key, normalized):
-            return False
+            return "visited", "already_visited"
 
-        if self.redis.sadd(self.discovered_key, normalized) == 1:
-            payload = json.dumps({"url": normalized, "depth": int(depth)})
+        if self.redis.sismember(self.discovered_key, normalized):
+            return "exists", "already_discovered"
+
+        # Frontier pressure control
+        if self.queue_size() >= self.max_frontier_queue_size:
+            return "throttled", "queue_pressure"
+
+        # Domain budgeting
+        domain = self._domain_from_url(normalized)
+        domain_count = int(self.redis.hget(self.domain_stats_key, domain) or 0)
+        domain_max = None
+        if domain_budget_map and domain in domain_budget_map:
+            try:
+                domain_max = int(domain_budget_map.get(domain))
+            except Exception:
+                domain_max = self.domain_max_requests_default
+        else:
+            domain_max = self.domain_max_requests_default
+
+        if domain_count >= domain_max:
+            return "domain_budget_exceeded", "domain_limit"
+
+        payload = json.dumps({"url": normalized, "depth": int(depth)})
+
+        # push to priority zset or list
+        if self.priority_enabled and score is not None:
+            # lower score = higher priority
+            self.redis.zadd(self.queue_zkey, {payload: float(score)})
+        else:
             self.redis.rpush(self.queue_key, payload)
-            return True
 
-        return False
+        self.redis.sadd(self.discovered_key, normalized)
+        return "added", "ok"
 
-    def enqueue_many(self, urls):
+    def enqueue_many(self, items, domain_budget_map=None):
         added = 0
-        for item in urls:
-            if isinstance(item, dict):
-                url = item.get("url")
-                depth = item.get("depth", 0)
+        dropped = 0
+        details = []
+        for it in items:
+            if isinstance(it, dict):
+                url = it.get("url")
+                depth = it.get("depth", 0)
+                score = it.get("score", None)
             else:
-                url = item
+                url = it
                 depth = 0
+                score = None
 
-            if self.enqueue(url, depth):
+            status, msg = self.enqueue(
+                url, depth=depth, score=score, domain_budget_map=domain_budget_map
+            )
+            details.append((url, status, msg))
+            if status == "added":
                 added += 1
+            else:
+                dropped += 1
 
-        return added
+        return {"added": added, "dropped": dropped, "details": details}
 
     def reserve(self, worker_id, lease_seconds=None):
         lease_seconds = int(lease_seconds or self.lease_seconds)
@@ -76,7 +150,7 @@ return item
             }
         )
         payload = self._reserve_script(
-            keys=[self.queue_key, self.inflight_key], args=[meta_json]
+            keys=[self.queue_zkey, self.queue_key, self.inflight_key], args=[meta_json]
         )
         if not payload:
             return None
@@ -95,9 +169,17 @@ return item
         return batch
 
     def acknowledge(self, payload, url=None):
-        self.redis.hdel(self.inflight_key, payload)
+        try:
+            self.redis.hdel(self.inflight_key, payload)
+        except Exception:
+            pass
         if url:
-            self.redis.sadd(self.visited_key, self.normalize_url(url))
+            nurl = self.normalize_url(url)
+            self.redis.sadd(self.visited_key, nurl)
+            # increment domain count and record last access
+            domain = self._domain_from_url(nurl)
+            self.redis.hincrby(self.domain_stats_key, domain, 1)
+            self.redis.hset(self.domain_last_key, domain, time.time())
 
     def requeue_stale(self, max_age_seconds=None):
         max_age_seconds = int(max_age_seconds or self.lease_seconds)
@@ -125,14 +207,24 @@ return item
             pipe = self.redis.pipeline()
             pipe.hdel(self.inflight_key, payload)
             if url and not self.redis.sismember(self.visited_key, url):
-                pipe.rpush(self.queue_key, json.dumps({"url": url, "depth": depth}))
+                # push back to zset at default score(depth)
+                if self.priority_enabled:
+                    pipe.zadd(
+                        self.queue_zkey,
+                        {json.dumps({"url": url, "depth": depth}): float(depth)},
+                    )
+                else:
+                    pipe.rpush(self.queue_key, json.dumps({"url": url, "depth": depth}))
             pipe.execute()
 
     def is_visited(self, url):
         return self.redis.sismember(self.visited_key, self.normalize_url(url))
 
     def queue_size(self):
-        return int(self.redis.llen(self.queue_key))
+        # combine zset and list sizes
+        z = int(self.redis.zcard(self.queue_zkey))
+        l = int(self.redis.llen(self.queue_key))
+        return z + l
 
     def inflight_size(self):
         return int(self.redis.hlen(self.inflight_key))
@@ -142,6 +234,16 @@ return item
 
     def is_empty(self):
         return self.queue_size() == 0 and self.inflight_size() == 0
+
+    def get_domain_last_access(self, domain):
+        v = self.redis.hget(self.domain_last_key, domain)
+        try:
+            return float(v) if v else 0.0
+        except Exception:
+            return 0.0
+
+    def get_domain_count(self, domain):
+        return int(self.redis.hget(self.domain_stats_key, domain) or 0)
 
     def close(self):
         self.redis.close()

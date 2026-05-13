@@ -6,15 +6,23 @@ import time
 import requests
 from bs4 import BeautifulSoup
 from threading import Thread
+import os
 
 # Initialize the Flask app and Flask-SocketIO
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret!"
 socketio = SocketIO(app)  # Remove async_mode='threading'
 
+# Elastic Cloud credentials
+ELASTIC_URL = os.getenv("ELASTIC_URL")
+ELASTIC_API_KEY = os.getenv("ELASTIC_API_KEY")
+
 # Initialize Elasticsearch client
 try:
-    es = Elasticsearch(hosts=["http://localhost:9200"])
+    es = Elasticsearch(
+        ELASTIC_URL,
+        api_key=ELASTIC_API_KEY
+    )
     es.info()
 except Exception as e:
     print(f"Warning: Could not connect to Elasticsearch: {e}")

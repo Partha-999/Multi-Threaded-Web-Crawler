@@ -9,3 +9,6 @@ elasticsearch==8.17.1
 aiohttp
 aiokafka
 redis==5.0.8
+gunicorn
+eventlet
+flask-socketio
