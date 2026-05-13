@@ -21,7 +21,8 @@ ELASTIC_API_KEY = os.getenv("ELASTIC_API_KEY")
 try:
     es = Elasticsearch(
         ELASTIC_URL,
-        api_key=ELASTIC_API_KEY
+        api_key=ELASTIC_API_KEY,
+        request_timeout=30
     )
     es.info()
 except Exception as e:
